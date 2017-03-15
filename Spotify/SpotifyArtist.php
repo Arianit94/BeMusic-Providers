@@ -44,17 +44,28 @@ class SpotifyArtist {
      */
     public function getArtist($name = null) {
         $artist   = false;
-        $response = $this->httpClient->get('search?type=artist&q="'.urlencode(str_replace('/', '+', $name)).'"&limit=50');
+        $artistSecondary = false;
 
+        $response = $this->httpClient->get('search?type=artist&q="'.urlencode(str_replace('/', '+', $name)).'"&limit=50');
+        
         //make sure we get exact name match when searching by name
         if (isset($response['artists']['items'][0])) {
             foreach ($response['artists']['items'] as $spotifyArtist) {
-                if (str_replace(' ', '', strtolower($spotifyArtist['name'])) === str_replace(' ', '', strtolower($name))) {
+            	$normalizedSpotifyName = str_replace([' ', '.'], '', strtolower($spotifyArtist['name']));
+            	$normalizedSpecifiedName = str_replace([' ', '.'], '', strtolower($name));
+
+                if ($normalizedSpotifyName === $normalizedSpecifiedName) {
                     $artist = $spotifyArtist; break;
+                }
+
+                if (str_contains($normalizedSpotifyName, $normalizedSpecifiedName)) {
+                	$artistSecondary = $spotifyArtist;
                 }
             }
         }
 
+        if ( ! $artist) $artist = $artistSecondary;
+        
         //if couldn't find artist, bail
         if ( ! $artist) return false;
 
