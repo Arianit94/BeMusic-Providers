@@ -1,10 +1,13 @@
 <?php namespace App\Services\Providers\Spotify;
 
 use Stringy\StaticStringy;
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
+use App\Traits\AuthorizesWithSpotify;
 use App\Services\Search\SearchInterface;
 
 class SpotifySearch implements SearchInterface {
+
+    use AuthorizesWithSpotify;
 
     /**
      * Http client instance.
@@ -16,8 +19,8 @@ class SpotifySearch implements SearchInterface {
     /**
      * Create new SpotifySearch instance.
      */
-    public function __construct(HttpClient $client) {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.spotify.com/v1/']);
+    public function __construct() {
+        $this->httpClient = \App::make('SpotifyHttpClient');
     }
 
     /**
@@ -41,7 +44,7 @@ class SpotifySearch implements SearchInterface {
         }
 
         $response = $this->httpClient->get("search?q=$query&type=$type&limit=$limit");
-
+         
         return $this->formatResponse($response);
     }
 

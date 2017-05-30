@@ -1,11 +1,9 @@
 <?php namespace App\Services\Providers\Spotify;
 
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
 use App\Traits\AuthorizesWithSpotify;
 
 class SpotifyRadio {
-
-    use AuthorizesWithSpotify;
 
     /**
      * HttpClient instance.
@@ -25,30 +23,25 @@ class SpotifyRadio {
      * Create new SpotifyArtist instance.
      */
     public function __construct(SpotifySearch $spotifySearch) {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.spotify.com/v1/']);
+        $this->httpClient = \App::make('SpotifyHttpClient');
         $this->spotifySearch = $spotifySearch;
     }
 
     public function getSuggestions($name)
     {
-        $this->authorize();
-
         $response = $this->spotifySearch->search($name, 1, 'artist');
 
         if ( ! isset($response['artists']) || empty($response['artists'])) return [];
 
         $spotifyId = $response['artists'][0]['spotify_id'];
 
-        $response = $this->httpClient->get('https://api.spotify.com/v1/recommendations',
+        $response = $this->httpClient->get('recommendations',
             [
                 'query' => [
                     'seed_artists'  => $spotifyId,
                     'min_popularity' => 30,
                     'limit' => 100,
                 ],
-                'headers' => [
-                    'Authorization' => 'Bearer '.$this->token
-                ]
             ]
         );
 

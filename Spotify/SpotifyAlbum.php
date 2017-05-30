@@ -1,6 +1,6 @@
 <?php namespace App\Services\Providers\Spotify;
 
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
 use App\Services\Providers\Spotify\SpotifyArtist;
 
 class SpotifyAlbum {
@@ -23,7 +23,7 @@ class SpotifyAlbum {
      * Create new SpotifyArtist instance.
      */
     public function __construct(SpotifyArtist $spotifyArtist) {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.spotify.com/v1/']);
+        $this->httpClient = \App::make('SpotifyHttpClient');
         $this->spotifyArtist = $spotifyArtist;
     }
 

@@ -2,7 +2,7 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
 
 class SpotifyArtist {
 
@@ -17,7 +17,7 @@ class SpotifyArtist {
      * Create new SpotifyArtist instance.
      */
     public function __construct() {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.spotify.com/v1/']);
+        $this->httpClient = \App::make('SpotifyHttpClient');
     }
 
     /**

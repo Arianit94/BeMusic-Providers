@@ -2,14 +2,11 @@
 
 use App\Artist;
 use App\Album;
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
 use App\Services\ArtistSaver;
-use App\Traits\AuthorizesWithSpotify;
 use App\Services\Providers\Spotify\SpotifyArtist;
 
 class SpotifyNewReleases {
-
-    use AuthorizesWithSpotify;
 
     /**
      * HttpClient instance.
@@ -37,7 +34,7 @@ class SpotifyNewReleases {
      */
     public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver)
     {
-        $this->httpClient    = new HttpClient(['base_url' => 'https://api.spotify.com/v1/']);
+        $this->httpClient    = \App::make('SpotifyHttpClient');
         $this->spotifyArtist = $spotifyArtist;
         $this->saver         = $saver;
 
@@ -46,9 +43,7 @@ class SpotifyNewReleases {
 
     public function getNewReleases()
     {
-        $this->authorize();
-
-        $response = $this->httpClient->get('browse/new-releases?country=US&limit=40', ['headers' => ['Authorization' => 'Bearer '.$this->token]]);
+        $response = $this->httpClient->get('browse/new-releases?country=US&limit=40');
 
         $albums = $this->spotifyArtist->getAlbums(null, $response['albums']);
 

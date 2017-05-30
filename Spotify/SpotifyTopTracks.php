@@ -3,7 +3,7 @@
 use App\Album;
 use App\Track;
 use App\Artist;
-use App\Services\HttpClient;
+use App\Services\Providers\Spotify\SpotifyHttpClient;
 use App\Services\ArtistSaver;
 use App\Services\Providers\Spotify\SpotifyArtist;
 
@@ -24,12 +24,20 @@ class SpotifyTopTracks {
     private $saver;
 
     /**
+     * Http client instance.
+     *
+     * @var HttpClient
+     */
+    private $httpClient;
+
+    /**
      * Create new SpotifyTopTracks instance.
      */
     public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver)
     {
         $this->spotifyArtist = $spotifyArtist;
         $this->saver         = $saver;
+        $this->httpClient    = \App::make('SpotifyHttpClient');
 
         ini_set('max_execution_time', 0);
     }
@@ -92,7 +100,7 @@ class SpotifyTopTracks {
 
     private function getTracks($ids)
     {
-        $response = (new HttpClient())->get('https://api.spotify.com/v1/tracks?ids='.$ids);
+        $response = $this->httpClient->get('tracks?ids='.$ids);
 
         return $response['tracks'];
     }
