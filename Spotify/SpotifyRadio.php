@@ -35,15 +35,7 @@ class SpotifyRadio {
 
         $spotifyId = $response['artists'][0]['spotify_id'];
 
-        $response = $this->httpClient->get('recommendations',
-            [
-                'query' => [
-                    'seed_artists'  => $spotifyId,
-                    'min_popularity' => 30,
-                    'limit' => 100,
-                ],
-            ]
-        );
+        $response = $this->httpClient->get("recommendations?seed_artists=$spotifyId&min_popularity=30&limit=100");
 
         if ( ! isset($response['tracks'][0])) return [];
 
