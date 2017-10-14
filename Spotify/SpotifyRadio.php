@@ -1,14 +1,14 @@
 <?php namespace App\Services\Providers\Spotify;
 
-use App\Services\Providers\Spotify\SpotifyHttpClient;
-use App\Traits\AuthorizesWithSpotify;
+use App\Artist;
+use App\Track;
 
 class SpotifyRadio {
 
     /**
      * HttpClient instance.
      *
-     * @var HttpClient
+     * @var SpotifyHttpClient
      */
     private $httpClient;
 
@@ -20,34 +20,53 @@ class SpotifyRadio {
     private $spotifySearch;
 
     /**
-     * Create new SpotifyArtist instance.
+     * @var SpotifyTopTracks
      */
-    public function __construct(SpotifySearch $spotifySearch) {
-        $this->httpClient = \App::make('SpotifyHttpClient');
+    private $spotifyTopTracks;
+
+    /**
+     * Create new SpotifyArtist instance.
+     *
+     * @param SpotifySearch $spotifySearch
+     * @param SpotifyHttpClient $httpClient
+     * @param SpotifyTopTracks $spotifyTopTracks
+     */
+    public function __construct(SpotifySearch $spotifySearch, SpotifyHttpClient $httpClient, SpotifyTopTracks $spotifyTopTracks) {
+        $this->httpClient = $httpClient;
         $this->spotifySearch = $spotifySearch;
+        $this->spotifyTopTracks = $spotifyTopTracks;
     }
 
-    public function getSuggestions($name)
+    /**
+     * Get recommendations for specified artist radio from spotify API.
+     *
+     * @param Artist|Track $item
+     * @param string $type
+     * @return array
+     */
+    public function getRecommendations($item, $type)
     {
-        $response = $this->spotifySearch->search($name, 1, 'artist');
+        if ( ! $spotifyId = $this->getSpotifyId($item, $type)) return [];
 
-        if ( ! isset($response['artists']) || empty($response['artists'])) return [];
+        $response = $this->httpClient->get("recommendations?seed_{$type}s=$spotifyId&min_popularity=30&limit=100");
+        return $this->spotifyTopTracks->saveAndLoad($response['tracks'], 100);
+    }
 
-        $spotifyId = $response['artists'][0]['spotify_id'];
-
-        $response = $this->httpClient->get("recommendations?seed_artists=$spotifyId&min_popularity=30&limit=100");
-
-        if ( ! isset($response['tracks'][0])) return [];
-
-        $tracks = [];
-
-        foreach($response['tracks'] as $track) {
-            $tracks[] = [
-                'name' => $track['name'],
-                'artist' => ['name' => $track['artists'][0]['name']],
-            ];
+    /**
+     * Get seed information from spotify API.
+     *
+     * @param Artist|Track $item
+     * @param string $type
+     * @return array
+     */
+    private function getSpotifyId($item, $type)
+    {
+        if ($type === 'artist') {
+            $response = $this->spotifySearch->search($item->name, 1, 'artist');
+            return isset($response['artists']) ? $response['artists'][0]['spotify_id'] : null;
+        } else {
+            $response = $this->spotifySearch->search("{$item->name}+artist:{$item->album->artist->name}", 1, 'track');
+            return isset($response['tracks']) ? $response['tracks'][0]['spotify_id'] : null;
         }
-
-        return $tracks;
     }
 }

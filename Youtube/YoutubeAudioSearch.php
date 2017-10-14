@@ -1,9 +1,11 @@
 <?php namespace App\Services\Providers\Youtube;
 
 use App;
+use GuzzleHttp\Exception\BadResponseException;
+use Log;
 use GuzzleHttp\Client;
+use App\Services\Settings;
 use App\Services\HttpClient;
-use League\Flysystem\Exception;
 
 class YoutubeAudioSearch {
 
@@ -15,67 +17,64 @@ class YoutubeAudioSearch {
     private $httpClient;
 
     /**
-     * Create new YoutubeSearch instance.
+     * @var Settings
      */
-    public function __construct() {
-        $this->httpClient = new HttpClient([
-            'base_url' => 'https://www.googleapis.com/youtube/v3/',
-        ]);
+    private $settings;
 
-        $this->settings = App::make('Settings');
+    /**
+     * Create new YoutubeSearch instance.
+     * @param Settings $settings
+     */
+    public function __construct(Settings $settings) {
+        $this->settings = $settings;
+
+        $this->httpClient = new HttpClient([
+            'headers' =>  ['Referer' => url('')],
+            'base_uri' => 'https://www.googleapis.com/youtube/v3/',
+            'exceptions' => true
+        ]);
     }
 
     /**
      * Search using youtube api and given params.
      *
      * @param string $artist
-     * @param string $artist
-     * @param int    $limit
-     * @param string $type
-     *
+     * @param string $track
      * @return array
      */
-    public function search($artist, $track, $limit = 10, $type = 'video')
+    public function search($artist, $track)
     {
-        $params = $this->getParams($artist, $track, $limit, $type);
+        $params = $this->getParams($artist, $track);
 
         try {
-            $response = $this->httpClient->get('search', ['query' => $params, 'config' => ['curl' => [CURLOPT_REFERER => url()]]]);
-        } catch(\Exception $e) {
+            $response = $this->httpClient->get('search', ['query' => $params]);
+        } catch(BadResponseException $e) {
+            Log::error($e->getResponse()->getBody()->getContents(), $params);
             $response = [];
         }
 
         return $this->formatResponse($response);
     }
 
-    public function getRelatedVideos($youtubeId, $limit = 20) {
-        $response = $this->httpClient->get('search', ['query' => [
-            'key' => $this->settings->get('youtube_api_key'),
-            'relatedToVideoId' => $youtubeId,
-            'part' => 'snippet',
-            'maxResults' => $limit,
-            'type' => 'video',
-            'videoEmbeddable' => 'true',
-        ]]);
-
-        return $this->formatResponse($response);
-    }
-
-    private function getParams($artist, $track, $limit, $type)
+    private function getParams($artist, $track)
     {
-        $track = str_replace(' - Without Skits', '', $track);
+        $append = '';
 
-        if (str_contains($track, ['(', ')'])) {
-            $track = trim(explode('(', $track)[0]);
+        //if "live" track is not being requested, append "video" to search
+        //query to prefer music videos over lyrics and live videos.
+        if ( ! str_contains(strtolower($track), '- live')) {
+            $append = 'video';
         }
 
         $params = [
-            'q' => "$artist - $track",
+            'q' => "$artist - $track $append",
             'key' => $this->settings->get('youtube_api_key'),
             'part' => 'snippet',
-            'maxResults' => $limit,
-            'type' => $type,
+            'maxResults' => 3,
+            'type' => 'video',
             'videoEmbeddable' => 'true',
+            'videoCategoryId' => 10, //music
+            'topicId' => '/m/04rlf' //music (all genres)
         ];
 
         $regionCode = $this->settings->get('youtube_region_code');
@@ -99,12 +98,21 @@ class YoutubeAudioSearch {
 
         if ( ! isset($response['items'])) return $formatted;
 
-        foreach($response['items'] as $item) {
-            $formatted[] = ['name' => $item['snippet']['title'], 'id' => $item['id']['videoId']];
-        }
-
-        if (empty($formatted)) return $formatted;
-
-        return count($formatted) < 2 ? $formatted[0] : $formatted;
+        return array_map(function($item) {
+            return ['title' => $item['snippet']['title'], 'id' => $item['id']['videoId']];
+        }, $response['items']);
     }
+
+    //    public function getRelatedVideos($youtubeId, $limit = 20) {
+//        $response = $this->httpClient->get('search', ['query' => [
+//            'key' => $this->settings->get('youtube_api_key'),
+//            'relatedToVideoId' => $youtubeId,
+//            'part' => 'snippet',
+//            'maxResults' => $limit,
+//            'type' => 'video',
+//            'videoEmbeddable' => 'true',
+//        ]]);
+//
+//        return $this->formatResponse($response);
+//    }
 }

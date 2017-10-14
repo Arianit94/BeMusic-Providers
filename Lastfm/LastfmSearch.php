@@ -1,22 +1,26 @@
-<?php namespace App\Services\Search;
+<?php namespace App\Services\Providers\Lastfm;
 
 use App\Services\HttpClient;
+use App\Services\Search\SearchInterface;
 
 class LastfmSearch implements SearchInterface {
 
     /**
-     * Http client instance.
-     *
      * @var HttpClient
      */
     private $httpClient;
 
     /**
+     * @var mixed
+     */
+    private $apiKey;
+
+    /**
      * Create new SpotifySearch instance.
      */
-    public function __construct(HttpClient $client) {
-        $this->httpClient = new HttpClient(['base_url' => 'http://ws.audioscrobbler.com/2.0/']);
-        $this->apiKey = false;
+    public function __construct() {
+        $this->httpClient = new HttpClient(['base_uri' => 'http://ws.audioscrobbler.com/2.0/']);
+        $this->apiKey = config('site.lastfm.key');
     }
 
     /**
@@ -24,7 +28,6 @@ class LastfmSearch implements SearchInterface {
      *
      * @param string  $q
      * @param int     $limit
-     * @param string  $type
      *
      * @return array
      */

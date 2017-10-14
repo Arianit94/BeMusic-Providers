@@ -6,27 +6,35 @@ use App\Services\Providers\Discogs\DiscogsArtist;
 class DiscogsAlbum {
 
     /**
-     * HttpClient instance.
-     *
      * @var HttpClient
      */
     private $httpClient;
 
     /**
-     * Discogs Artist Instance.
-     *
      * @var DiscogsArtist
      */
     private $discogsArtist;
 
     /**
+     * @var string
+     */
+    private $key;
+
+    /**
+     * @var string
+     */
+    private $secret;
+
+    /**
      * Create new DiscogsArtist instance.
+     *
+     * @param DiscogsArtist $discogsArtist
      */
     public function __construct(DiscogsArtist $discogsArtist) {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.discogs.com/']);
+        $this->httpClient = new HttpClient(['base_uri' => 'https://api.discogs.com/']);
         $this->discogsArtist = $discogsArtist;
-        $this->key = env('DISCOGS_KEY');
-        $this->secret = env('DISCOGS_SECRET');
+        $this->key = config('site.discogs.id');
+        $this->secret = config('site.discogs.secret');
     }
 
     /**
@@ -51,7 +59,7 @@ class DiscogsAlbum {
      * @param string  $artistName
      * @param string  $albumName
      *
-     * @return array|void
+     * @return array
      */
     public function getAlbum($artistName, $albumName) {
         if ( ! $artistName) {

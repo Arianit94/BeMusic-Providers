@@ -1,26 +1,25 @@
 <?php namespace App\Services\Providers\Spotify;
 
-use Stringy\StaticStringy;
-use App\Services\Providers\Spotify\SpotifyHttpClient;
-use App\Traits\AuthorizesWithSpotify;
+use App;
+use GuzzleHttp\Exception\BadResponseException;
+use Illuminate\Support\Str;
 use App\Services\Search\SearchInterface;
+use Log;
 
 class SpotifySearch implements SearchInterface {
-
-    use AuthorizesWithSpotify;
-
+    
     /**
-     * Http client instance.
-     *
-     * @var HttpClient
+     * @var SpotifyHttpClient
      */
     private $httpClient;
 
     /**
      * Create new SpotifySearch instance.
+     *
+     * @param SpotifyHttpClient $spotifyHttpClient
      */
-    public function __construct() {
-        $this->httpClient = \App::make('SpotifyHttpClient');
+    public function __construct(SpotifyHttpClient $spotifyHttpClient) {
+        $this->httpClient = $spotifyHttpClient;
     }
 
     /**
@@ -38,13 +37,20 @@ class SpotifySearch implements SearchInterface {
             $query = $q;
         }
         else {
-            $query = StaticStringy::toAscii($q, false);
+            $query = Str::ascii($q);
 
             $query = $query.' OR '.$query.'*';
         }
 
-        $response = $this->httpClient->get("search?q=$query&type=$type&limit=$limit");
-         
+        $query = str_replace('.', '', $query);
+
+        try {
+            $response = $this->httpClient->get("search?q=$query&type=$type&limit=$limit");
+        } catch(BadResponseException $e) {
+            Log::error($e->getResponse()->getBody()->getContents(), ['query' => $query]);
+            $response = [];
+        }
+        
         return $this->formatResponse($response);
     }
 
@@ -66,8 +72,9 @@ class SpotifySearch implements SearchInterface {
             ];
 
             if (isset($item['images']) && count($item['images'])) {
-                $formatted['image_small'] = last($item['images'])['url'];
-                $formatted['image_large'] = head($item['images'])['url'];
+                $smallImageIndex = (isset($data['images'][2]) && isset($item['images'][2]['width']) && $item['images'][2]['width'] < 170) ? 1 : 2;
+                $formatted['image_small'] = $this->getImage($item['images'], $smallImageIndex);
+                $formatted['image_large'] = $this->getImage($item['images']);
             }
 
             if (isset($item['popularity'])) {
@@ -120,23 +127,16 @@ class SpotifySearch implements SearchInterface {
     /**
      * Fetch full album objects from spotify and format them.
      *
-     * @param array   $albums
-     *
+     * @param array $albums
      * @return array
      */
     private function getAlbums($albums)
     {
-        if (empty($albums)) return [];
-
-        $ids = $this->makeAlbumsIdsString($albums);
-
-        $response = $this->httpClient->get("albums?ids=$ids");
-
         $formatted = [];
 
-        if ( ! isset($response['albums'])) return $formatted;
+        if (empty($albums)) return $formatted;
 
-        foreach($response['albums'] as $album) {
+        foreach($albums as $album) {
             $artist = [
                 'name'           => $album['artists'][0]['name'],
                 'spotify_id'    => $album['artists'][0]['id'],
@@ -145,9 +145,10 @@ class SpotifySearch implements SearchInterface {
 
             $formatted[] = [
                 'name'       => $album['name'],
-                'popularity' => $album['popularity'],
+                'popularity' => null,
                 'artist'     => $artist,
                 'image'      =>  isset($album['images'][1]['url']) ? $album['images'][1]['url'] : null,
+                'fully_scraped' => 0
             ];
         }
 
@@ -155,19 +156,25 @@ class SpotifySearch implements SearchInterface {
     }
 
     /**
-     * Concat spotify ids of given albums into a single string.
+     * Get image string from spotify images array if available.
      *
-     * @param array $albums
-     * @return string
+     * @param mixed $images
+     * @param int   $index
+     * @return mixed
      */
-    private function makeAlbumsIdsString($albums)
+    private function getImage($images, $index = 0)
     {
-        $ids = [];
+        if ($images && count($images)) {
 
-        foreach($albums as $album) {
-            $ids[] = $album['id'];
+            if (isset($images[$index])) {
+                return $images[$index]['url'];
+            }
+
+            foreach($images as $image) {
+                return $image['url'];
+            }
         }
 
-        return implode(',', $ids);
+        return null;
     }
 }

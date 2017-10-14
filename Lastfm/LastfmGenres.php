@@ -1,13 +1,11 @@
 <?php namespace App\Services\Providers\Lastfm;
 
 use App;
-use Cache;
-use App\Album;
 use App\Artist;
-use Carbon\Carbon;
+use App\Services\Settings;
 use Illuminate\Support\Str;
 use App\Services\HttpClient;
-use App\Services\ArtistSaver;
+use App\Services\Artists\ArtistSaver;
 use Illuminate\Support\Collection;
 use App\Services\Providers\Spotify\SpotifyArtist;
 
@@ -16,67 +14,62 @@ class LastfmGenres {
     /**
      * Links of artist placeholder images on last.fm
      * 
-     * @var Array
+     * @var array
      */
     private $lastfmPlaceholderImages = [
         'https://lastfm-img2.akamaized.net/i/u/289e0f7b270445e5c550714f606fd8fd.png'
     ];
 
     /**
-     * HttpClient instance.
-     *
      * @var HttpClient
      */
     private $httpClient;
 
     /**
-     * SpotifyArtist service instance.
-     *
      * @var SpotifyArtist
      */
     private $spotifyArtist;
 
     /**
-     * ArtistSaver instance.
-     * 
      * @var ArtistSaver
      */
     private $saver;
 
     /**
-     * Settings service instance.
-     *
      * @var App\Services\Settings
      */
     private $settings;
 
     /**
-     * Create new LastfmGenres instance.
+     * @var string
      */
-    public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver)
-    {
-        $this->httpClient    = new HttpClient(['base_url' => 'http://ws.audioscrobbler.com/2.0/']);
-        $this->spotifyArtist = $spotifyArtist;
-        $this->saver         = $saver;
-        $this->settings      = App::make('Settings');
-        $this->apiKey        = $this->settings->get('lastfm_api_key');
+    private $apiKey;
 
-        if ( ! $this->apiKey) {
-            $this->apiKey = env('LASTFM_API_KEY');
-        }
+    /**
+     * Create new LastfmGenres instance.
+     *
+     * @param SpotifyArtist $spotifyArtist
+     * @param ArtistSaver $saver
+     * @param Settings $settings
+     */
+    public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver, Settings $settings)
+    {
+        $this->httpClient = new HttpClient(['base_uri' => 'http://ws.audioscrobbler.com/2.0/']);
+        $this->spotifyArtist = $spotifyArtist;
+        $this->saver = $saver;
+        $this->settings = $settings;
+        $this->apiKey = config('site.lastfm.key');
 
         ini_set('max_execution_time', 0);
     }
 
     public function getGenres($genreNames = null)
     {
-        return Cache::remember('lastfm.genres', Carbon::now()->addDays(2), function() use($genreNames) {
-            if ($genreNames) {
-                return $this->formatGenres($genreNames)['formatted'];
-            } else {
-                return $this->getMostPopular();
-            }
-        });
+        if ($genreNames) {
+            return $this->formatGenres($genreNames)['formatted'];
+        } else {
+            return $this->getMostPopular();
+        }
     }
 
     public function getMostPopular()
@@ -178,19 +171,24 @@ class LastfmGenres {
 
         $end = 'assets/images/genres/'.$genreName.'.jpg';
 
-        return App::make('Settings')->get('enable_https') ? secure_url($end) : url($end);
+        return url($end);
     }
 
     private function collectionContainsArtist($name, $collection) {
         foreach ($collection as $artist) {
-            $needle = Str::slug($name);
-            $artistName = Str::slug($artist['name']);
-
-            if (( ! $needle || ! $artistName) || $needle == $artistName) {
+            if ($this->normalizeName($name) === $this->normalizeName($artist['name'])) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function normalizeName($name)
+    {
+        $name = htmlentities($name, ENT_QUOTES, 'UTF-8');
+        $name = preg_replace('~&([a-z]{1,2})(acute|cedil|circ|grave|lig|orn|ring|slash|th|tilde|uml);~i', '$1', $name);
+        $name = preg_replace('~[^0-9a-z]+~i', '-', $name);
+        return trim(strtolower($name));
     }
 }

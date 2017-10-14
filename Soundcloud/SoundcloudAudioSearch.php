@@ -1,6 +1,7 @@
 <?php namespace App\Services\Providers\Soundcloud;
 
 use App;
+use App\Services\Settings;
 use GuzzleHttp\Client;
 use App\Services\HttpClient;
 
@@ -22,24 +23,28 @@ class SoundcloudAudioSearch {
 
     /**
      * SoundCloud API Key
+     *
      * @var string
      */
     private $key;
 
     /**
      * Create new YoutubeSearch instance.
+     *
+     * @param Settings $settings
      */
-    public function __construct() {
+    public function __construct(Settings $settings) {
         $this->httpClient = new HttpClient([
-            'base_url' => 'http://api.soundcloud.com/',
+            'base_uri' => 'http://api.soundcloud.com/',
+            'exceptions' => true,
         ]);
 
-        $this->settings = App::make('Settings');
-        $this->key = env('SOUNDCLOUD_API_KEY');
+        $this->settings = $settings;
+        $this->key = config('site.soundcloud.key');
     }
 
     /**
-     * Search using youtube api and given params.
+     * Search using soundcloud api and given params.
      *
      * @param string $artistName
      * @param string $trackName
@@ -61,6 +66,8 @@ class SoundcloudAudioSearch {
      * Format and normalize youtube response for use in our app.
      *
      * @param array $response
+     * @param string $artistName
+     * @param string $trackName
      * @return array
      */
     private function formatResponse($response, $artistName, $trackName) {
@@ -81,7 +88,7 @@ class SoundcloudAudioSearch {
         $formatted['name'] = $match['title'];
         $formatted['id']   = $match['uri'];
 
-        return $formatted;
+        return [$formatted];
     }
 
     /**

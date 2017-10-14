@@ -11,6 +11,6 @@ class LocalTopTracks {
      * @return Collection
      */
     public function getTopTracks() {
-        return Track::with('album.artist')->orderBy('spotify_popularity', 'desc')->limit(50)->get();
+        return Track::with('album.artist')->orderBy('plays', 'desc')->limit(50)->get();
     }
 }

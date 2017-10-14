@@ -1,25 +1,34 @@
 <?php namespace App\Services\Providers\Discogs;
 
-use Stringy\StaticStringy;
 use App\Services\HttpClient;
 use App\Services\Search\SearchInterface;
 
 class DiscogsSearch implements SearchInterface {
 
     /**
-     * Http client instance.
-     *
      * @var HttpClient
      */
     private $httpClient;
 
     /**
+     * @var string
+     */
+    private $key;
+
+    /**
+     * @var string
+     */
+    private $secret;
+
+    /**
      * Create new SpotifySearch instance.
+
+     * @param HttpClient $client
      */
     public function __construct(HttpClient $client) {
-        $this->httpClient = new HttpClient(['base_url' => 'https://api.discogs.com/database/search']);
-        $this->key = env('DISCOGS_KEY');
-        $this->secret = env('DISCOGS_SECRET');
+        $this->httpClient = new HttpClient(['base_uri' => 'https://api.discogs.com/database/search']);
+        $this->key = config('site.discogs.id');
+        $this->secret = config('site.discogs.secret');
     }
 
     /**

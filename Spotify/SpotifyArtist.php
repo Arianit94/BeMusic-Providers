@@ -1,23 +1,25 @@
 <?php namespace App\Services\Providers\Spotify;
 
 use Carbon\Carbon;
-use Illuminate\Support\Str;
-use App\Services\Providers\Spotify\SpotifyHttpClient;
+use GuzzleHttp\Exception\BadResponseException;
+use Log;
 
 class SpotifyArtist {
 
     /**
      * HttpClient instance.
      *
-     * @var HttpClient
+     * @var SpotifyHttpClient
      */
     private $httpClient;
 
     /**
      * Create new SpotifyArtist instance.
+     *
+     * @param SpotifyHttpClient $spotifyHttpClient
      */
-    public function __construct() {
-        $this->httpClient = \App::make('SpotifyHttpClient');
+    public function __construct(SpotifyHttpClient $spotifyHttpClient) {
+        $this->httpClient = $spotifyHttpClient;
     }
 
     /**
@@ -36,18 +38,23 @@ class SpotifyArtist {
     }
 
     /**
-     * Get artist, his albums and those albums tracks.
+     * Get full artist (albums, tracks, similar)
      *
      * @param null|string     $name
      *
      * @return array|false
      */
     public function getArtist($name = null) {
-        $artist   = false;
-        $artistSecondary = false;
+        $artist   = null;
+        $artistSecondary = null;
 
-        $response = $this->httpClient->get('search?type=artist&q="'.urlencode(str_replace('/', '+', $name)).'"&limit=50');
-        
+        try {
+            $response = $this->httpClient->get("search?type=artist&q=$name&limit=50");
+        } catch(BadResponseException $e) {
+            Log::error($e->getResponse()->getBody()->getContents(), ['query' => 'name']);
+            $response = [];
+        }
+
         //make sure we get exact name match when searching by name
         if (isset($response['artists']['items'][0])) {
             foreach ($response['artists']['items'] as $spotifyArtist) {
@@ -65,7 +72,7 @@ class SpotifyArtist {
         }
 
         if ( ! $artist) $artist = $artistSecondary;
-        
+
         //if couldn't find artist, bail
         if ( ! $artist) return false;
 

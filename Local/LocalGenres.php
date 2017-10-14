@@ -1,29 +1,39 @@
 <?php namespace App\Services\Providers\Local;
 
-use DB;
-use Input;
-use Cache;
 use App\Genre;
-use App\Track;
-use Carbon\Carbon;
-use App\Services\Paginator;
+use App\Services\Providers\Lastfm\LastfmGenres;
+use App\Services\Settings;
 use Illuminate\Database\Eloquent\Collection;
 
 class LocalGenres {
 
     /**
-     * Paginator Instance.
-     *
-     * @var Paginator
+     * @var Settings
      */
-    private $paginator;
+    private $settings;
 
     /**
-    * Create new LocalGenres instance.
-    */
-    public function __construct(Paginator $paginator)
+     * @var Genre
+     */
+    private $genre;
+
+    /**
+     * @var LastfmGenres
+     */
+    private $lastfmGenres;
+
+    /**
+     * Create new LocalGenres instance.
+     *
+     * @param Settings $settings
+     * @param Genre $genre
+     * @param LastfmGenres $lastfmGenres
+     */
+    public function __construct(Settings $settings, Genre $genre, LastfmGenres $lastfmGenres)
     {
-        $this->paginator = $paginator;
+        $this->genre = $genre;
+        $this->settings = $settings;
+        $this->lastfmGenres = $lastfmGenres;
     }
 
     /**
@@ -31,40 +41,23 @@ class LocalGenres {
      *
      * @return Collection
      */
-    public function getGenres($names) {
-        $names    = str_replace(', ', ',', $names);
-        $orderBy  = implode(',', array_map(function($v) { return "'".$v."'"; }, explode(',', $names)));
-        $cacheKey = 'genres.'.Input::get('limit', 20).$names;
+    public function getGenres() {
+        $names = json_decode($this->settings->get('homepage.genres'), true);
 
-        if (Cache::has($cacheKey)) {
-            return Cache::get($cacheKey);
-        }
+        if ( ! $names) return collect();
 
-        $genres = Genre::whereIn('name', explode(',', $names))->orderByRaw(DB::raw("FIELD(name, $orderBy)"))->get();
-
-        if ($genres->isEmpty()) {
-            abort(404);
-        }
-
-        //limit artists loaded for genres
-        $genres->map(function ($genre) {
-            $genre->load(['artists' => function ($q) {
-                $q->limit(Input::get('limit', 20));
-            }]);
-
+        $genres = $this->genre->whereIn('name', $names)->get()->map(function(Genre $genre) {
+            $genre['image'] = $this->lastfmGenres->getLocalImagePath($genre->name);
             return $genre;
         });
 
-        Cache::put($cacheKey, $genres, Carbon::now()->addDays(1));
-
-        return $genres;
+        return $genres->sort(function(Genre $current, Genre $previous) use($names) {
+            return array_search($current->name, $names) > array_search($previous->name, $names);
+        })->values();
     }
-    
+
     public function getGenreArtists(Genre $genre)
     {
-        $input = Input::all(); $input['itemsPerPage'] = 20;
-        $artists = $this->paginator->paginate($genre->artists(), $input, 'artists')->toArray();
-
-        return ['genre' => $genre, 'artists' => $artists];
+        return null;
     }
 }

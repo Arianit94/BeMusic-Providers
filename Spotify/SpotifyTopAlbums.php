@@ -1,19 +1,19 @@
-<?php namespace App\Services\Providers\Local;
+<?php namespace App\Services\Providers\Spotify;
 
 use App\Album;
 use Illuminate\Database\Eloquent\Collection;
 
-class LocalTopAlbums {
+class SpotifyTopAlbums {
 
     /**
-     * Get top albums using local provider.
+     * Get top albums using spotify provider.
      *
      * @return Collection
      */
     public function getTopAlbums() {
         return Album::with('artist', 'tracks')
             ->has('tracks', '>=', 5)
-            ->orderBy('views', 'desc')
+            ->orderBy('spotify_popularity', 'desc')
             ->limit(40)
             ->get();
     }

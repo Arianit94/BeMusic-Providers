@@ -2,8 +2,9 @@
 
 use App\Artist;
 use App\Album;
+use App\Services\HttpClient;
 use App\Services\Providers\Spotify\SpotifyHttpClient;
-use App\Services\ArtistSaver;
+use App\Services\Artists\ArtistSaver;
 use App\Services\Providers\Spotify\SpotifyArtist;
 
 class SpotifyNewReleases {
@@ -31,12 +32,16 @@ class SpotifyNewReleases {
 
     /**
      * Create new SpotifyArtist instance.
+     *
+     * @param ArtistSaver $saver
+     * @param SpotifyArtist $spotifyArtist
+     * @param SpotifyHttpClient $httpClient
      */
-    public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver)
+    public function __construct(SpotifyArtist $spotifyArtist, ArtistSaver $saver, SpotifyHttpClient $httpClient)
     {
-        $this->httpClient    = \App::make('SpotifyHttpClient');
+        $this->saver = $saver;
+        $this->httpClient = $httpClient;
         $this->spotifyArtist = $spotifyArtist;
-        $this->saver         = $saver;
 
         ini_set('max_execution_time', 0);
     }
@@ -84,7 +89,7 @@ class SpotifyNewReleases {
             $id = $model ? $model->id : false;
 
             $albums[$k]['artist_id'] = $id;
-            $albums[$k]['fully_scraped'] = null;
+            $albums[$k]['fully_scraped'] = 1;
 
             unset($albums[$k]['artist']);
 

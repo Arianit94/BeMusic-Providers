@@ -5,22 +5,31 @@ use App\Services\HttpClient;
 class DiscogsArtist {
 
     /**
-     * HttpClient instance.
-     *
      * @var HttpClient
      */
     private $httpClient;
+
+    /**
+     * @var string
+     */
+    private $key;
+
+    /**
+     * @var string
+     */
+    private $secret;
+
 
     /**
      * Create new SpotifyArtist instance.
      */
     public function __construct() {
         $this->httpClient = new HttpClient([
-            'base_url' => 'https://api.discogs.com/',
+            'base_uri' => 'https://api.discogs.com/',
         ]);
 
-        $this->key = env('DISCOGS_KEY');
-        $this->secret = env('DISCOGS_SECRET');
+        $this->key = config('site.discogs.id');
+        $this->secret = config('site.discogs.secret');
     }
 
     /**
@@ -42,8 +51,7 @@ class DiscogsArtist {
     /**
      * Get artist, his albums and those albums tracks.
      *
-     * @param null|string     $name
-     *
+     * @param string $identifier
      * @return array|false
      */
     public function getArtist($identifier = null)
@@ -108,7 +116,7 @@ class DiscogsArtist {
         if ($fullAlbum) {
            if (isset($fullAlbum['genres'])) {
                $formatted['genres'] = array_map(function($genreName) {
-                   return ['name' => $genreName];
+                   return $genreName;
                }, $fullAlbum['genres']);
            }
 
@@ -132,6 +140,7 @@ class DiscogsArtist {
      * Normalize Discogs images array.
      *
      * @param $images
+     * @param string $type
      * @return array
      */
     public function getCorrectSizeImage($images, $type)

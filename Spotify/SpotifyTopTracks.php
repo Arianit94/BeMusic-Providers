@@ -4,8 +4,11 @@ use App\Album;
 use App\Track;
 use App\Artist;
 use App\Services\Providers\Spotify\SpotifyHttpClient;
-use App\Services\ArtistSaver;
+use App\Services\Artists\ArtistSaver;
 use App\Services\Providers\Spotify\SpotifyArtist;
+use function GuzzleHttp\Psr7\str;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SpotifyTopTracks {
 
@@ -63,6 +66,11 @@ class SpotifyTopTracks {
 
         $tracks = $this->getTracks(trim($ids, ','));
 
+        return $this->saveAndLoad($tracks);
+    }
+
+    public function saveAndLoad($tracks, $limit = 50)
+    {
         $tracks = $this->spotifyArtist->formatTracks($tracks, true);
 
         $artists = [];
@@ -81,7 +89,8 @@ class SpotifyTopTracks {
 
         $albums = $this->saveAlbums($tracks, $artists);
 
-        return $this->saveTracks($tracks, $albums)->values();
+        return $this->saveTracks($tracks, $albums, $limit)->values();
+
     }
 
     /**
@@ -105,7 +114,7 @@ class SpotifyTopTracks {
         return $response['tracks'];
     }
 
-    private function saveTracks($tracks, $albums)
+    private function saveTracks($tracks, $albums, $limit = 50)
     {
         $tracks = array_values($tracks);
 
@@ -126,7 +135,9 @@ class SpotifyTopTracks {
 
         $this->saver->saveOrUpdate($tracks, array_flatten($tracks), 'tracks');
 
-        $tracks = Track::with('album.artist')->where('temp_id', $tempId)->limit(50)->get();
+        $tracks = Track::with(['album.artist' => function(BelongsTo $q) {
+            return $q->select('id', 'name');
+        }])->where('temp_id', $tempId)->limit($limit)->get();
 
         return $tracks->sort(function($a, $b) use ($originalOrder) {
             $originalAIndex = isset($originalOrder[$a->name]) ? $originalOrder[$a->name] : 0;
@@ -141,7 +152,7 @@ class SpotifyTopTracks {
 
     private function saveAlbums($tracks, $artists)
     {
-        $albums = []; $albumNames = []; $albumImages = [];
+        $albums = []; $albumNames = []; $albumImages = []; $tempId = str_random(8);
 
         foreach($tracks as $track) {
             $image = isset($track['album']['images'][1]['url']) ? $track['album']['images'][1]['url'] : head($track['album']['images'])['url'];
@@ -150,6 +161,7 @@ class SpotifyTopTracks {
                 'name'  => $track['album']['name'],
                 'image' => $image,
                 'fully_scraped' => 0,
+                'temp_id' => $tempId,
                 'artist_id' => $this->getItemId($track['artist']['name'], $artists)
             ];
 
@@ -157,21 +169,24 @@ class SpotifyTopTracks {
             $albumImages[] = $image;
         }
 
-        $existing = Album::whereIn('name', $albumNames)->whereIn('image', $albumImages)->groupBy('name')->distinct()->get();
+        $existing = Album::whereIn('name', $albumNames)->whereIn('image', $albumImages)->groupBy('albums.id')->distinct()->get();
 
         $albumsToFetch = [];
 
         foreach($albums as $k => $album) {
             if ($this->inArray($album['name'], $existing)) {
                 unset($albums[$k]);
-            } else {
+            } else if ( ! in_array($album['name'], $albumsToFetch)) {
                 $albumsToFetch[] = $album['name'];
             }
         }
 
         $this->saver->saveOrUpdate($albums, array_flatten($albums), 'albums');
 
-        $new = Album::whereIn('name', $albumsToFetch)->get();
+        $new = [];
+        if ( ! empty($albumsToFetch)) {
+            $new = Album::where('temp_id', $tempId)->get();
+        }
 
         return $existing->merge($new);
 
@@ -179,21 +194,24 @@ class SpotifyTopTracks {
 
     private function saveArtists($artists, $artistNames)
     {
-        $existing = Artist::whereIn('name', $artistNames)->get();
+        $existing = Artist::whereIn('name', array_unique($artistNames))->get();
 
         $artistsToFetch = [];
 
         foreach($artists as $k => $artist) {
             if ($this->inArray($artist['name'], $existing)) {
                 unset($artists[$k]);
-            } else {
+            } else if ( ! in_array($artist['name'], $artistsToFetch)) {
                 $artistsToFetch[] = $artist['name'];
             }
         }
 
         $this->saver->saveOrUpdate($artists, array_flatten($artists), 'artists');
 
-        $new = Artist::whereIn('name', $artistsToFetch)->get();
+        $new = [];
+        if ( ! empty($artistsToFetch)) {
+            $new = Artist::whereIn('name', $artistsToFetch)->get();
+        }
 
         return $existing->merge($new);
     }
