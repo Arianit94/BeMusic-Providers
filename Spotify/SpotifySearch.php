@@ -38,7 +38,7 @@ class SpotifySearch implements SearchInterface {
         }
         else {
             $query = Str::ascii($q);
-
+            if ( ! trim($query)) $query = $q;
             $query = $query.' OR '.$query.'*';
         }
 

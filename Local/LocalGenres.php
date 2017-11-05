@@ -46,7 +46,11 @@ class LocalGenres {
 
         if ( ! $names) return collect();
 
-        $genres = $this->genre->whereIn('name', $names)->get()->map(function(Genre $genre) {
+        $genres = $this->genre->whereIn('name', $names)->get();
+
+        $newGenres = $this->maybeCreateNonExistentGenres($names, $genres);
+
+        $genres = $genres->merge($newGenres)->map(function(Genre $genre) {
             $genre['image'] = $this->lastfmGenres->getLocalImagePath($genre->name);
             return $genre;
         });
@@ -54,6 +58,32 @@ class LocalGenres {
         return $genres->sort(function(Genre $current, Genre $previous) use($names) {
             return array_search($current->name, $names) > array_search($previous->name, $names);
         })->values();
+    }
+
+    /**
+     * Create genres with specified names, if they don't exist already.
+     *
+     * @param array $names
+     * @param Collection $genres
+     * @return Collection
+     */
+    private function maybeCreateNonExistentGenres($names, Collection $genres)
+    {
+        $names = array_filter($names, function($name) use($genres) {
+            return ! $genres->first(function(Genre $genre) use($name) {
+                return strtolower($genre->name) === strtolower($name);
+            });
+        });
+
+        if (empty($names)) return collect();
+
+        $newGenres = array_map(function($name) {
+            return ['name' => $name];
+        }, $names);
+
+        $this->genre->insert($newGenres);
+
+        return $this->genre->whereIn('name', $names)->get();
     }
 
     public function getGenreArtists(Genre $genre)

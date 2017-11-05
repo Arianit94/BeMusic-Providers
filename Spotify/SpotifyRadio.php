@@ -49,6 +49,9 @@ class SpotifyRadio {
         if ( ! $spotifyId = $this->getSpotifyId($item, $type)) return [];
 
         $response = $this->httpClient->get("recommendations?seed_{$type}s=$spotifyId&min_popularity=30&limit=100");
+
+        if ( ! isset($response['tracks'])) return [];
+
         return $this->spotifyTopTracks->saveAndLoad($response['tracks'], 100);
     }
 
@@ -63,10 +66,10 @@ class SpotifyRadio {
     {
         if ($type === 'artist') {
             $response = $this->spotifySearch->search($item->name, 1, 'artist');
-            return isset($response['artists']) ? $response['artists'][0]['spotify_id'] : null;
+            return isset($response['artists'][0]['spotify_id']) ? $response['artists'][0]['spotify_id'] : null;
         } else {
             $response = $this->spotifySearch->search("{$item->name}+artist:{$item->album->artist->name}", 1, 'track');
-            return isset($response['tracks']) ? $response['tracks'][0]['spotify_id'] : null;
+            return isset($response['tracks'][0]['spotify_id']) ? $response['tracks'][0]['spotify_id'] : null;
         }
     }
 }

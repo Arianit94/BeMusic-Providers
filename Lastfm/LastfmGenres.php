@@ -13,7 +13,7 @@ class LastfmGenres {
 
     /**
      * Links of artist placeholder images on last.fm
-     * 
+     *
      * @var array
      */
     private $lastfmPlaceholderImages = [
@@ -63,10 +63,12 @@ class LastfmGenres {
         ini_set('max_execution_time', 0);
     }
 
-    public function getGenres($genreNames = null)
+    public function getGenres()
     {
-        if ($genreNames) {
-            return $this->formatGenres($genreNames)['formatted'];
+        $names = json_decode($this->settings->get('homepage.genres'), true);
+
+        if ($names && ! empty($names)) {
+            return $this->formatGenres($names)['formatted'];
         } else {
             return $this->getMostPopular();
         }
@@ -122,7 +124,7 @@ class LastfmGenres {
             if ( ! $this->collectionContainsArtist($artist['name'], $formatted)) {
 
                 $img = ! in_array($artist['image'][4]['#text'], $this->lastfmPlaceholderImages) ? $artist['image'][4]['#text'] : null;
-               
+
                 $formatted[] = [
                     'name' => $artist['name'],
                     'image_small' => $img,
@@ -139,7 +141,11 @@ class LastfmGenres {
             return ! $this->collectionContainsArtist($artist['name'], $existing);
         });
 
-        Artist::insert($insert);
+        try {
+            Artist::insert($insert);
+        } catch(\Exception $e) {
+            //
+        }
 
         $artists = Artist::whereIn('name', $names)->get();
 
@@ -186,9 +192,6 @@ class LastfmGenres {
 
     private function normalizeName($name)
     {
-        $name = htmlentities($name, ENT_QUOTES, 'UTF-8');
-        $name = preg_replace('~&([a-z]{1,2})(acute|cedil|circ|grave|lig|orn|ring|slash|th|tilde|uml);~i', '$1', $name);
-        $name = preg_replace('~[^0-9a-z]+~i', '-', $name);
-        return trim(strtolower($name));
+        return trim(Str::ascii(mb_strtolower($name)));
     }
 }

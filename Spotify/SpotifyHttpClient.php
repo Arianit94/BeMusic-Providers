@@ -69,7 +69,7 @@ class SpotifyHttpClient extends HttpClient {
             $this->logApiError($e, $auth);
         }
 
-        $this->token = $result['access_token'];
+        $this->token = isset($result['access_token']) ? $result['access_token'] : null;
     }
 
     /**
